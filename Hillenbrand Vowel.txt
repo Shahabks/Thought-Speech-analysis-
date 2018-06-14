@@ -1,0 +1,149 @@
+######################################
+# Data from Hillenbrand et al. 1995: #
+######################################
+
+HH <- read.table("htable", header=TRUE)
+NHROWS <- dim(HH)[1]
+
+###############################################
+# Avoid pretending that missing values are 0: #
+###############################################
+
+missingF2 <- HH[,"F2"]==0
+HH[missingF2,"F2"] <- NA
+
+####################################################
+# Get mean values by man/woman/boy/girl and vowel: #
+####################################################
+
+isman <- HH[,"mwbg"]=="m"
+iswoman <- HH[,"mwbg"]=="w"
+isboy <- HH[,"mwbg"]=="b"
+isgirl <- HH[,"mwbg"]=="g"
+#
+vowelIDs <- c("iy","ei","ae","ah","aw","oa","uw", "ih","eh","uh","oo","er")
+#
+MF1 <- vector(length=12); MF2 <- vector(length=12)
+WF1 <- vector(length=12); WF2 <- vector(length=12)
+BF1 <- vector(length=12); BF2 <- vector(length=12)
+GF1 <- vector(length=12); GF2 <- vector(length=12)
+#
+for(v in 1:12){
+    whichV <- HH[,"vowel"]==vowelIDs[v]
+    MF1[v] <- mean(HH[isman & whichV, "F1"],na.rm=TRUE)
+    MF2[v]  <- mean(HH[isman & whichV, "F2"],na.rm=TRUE)
+    WF1[v]  <- mean(HH[iswoman & whichV, "F1"],na.rm=TRUE)
+    WF2[v]  <- mean(HH[iswoman & whichV, "F2"],na.rm=TRUE)
+    BF1[v]  <- mean(HH[isboy & whichV, "F1"],na.rm=TRUE)
+    BF2[v]  <- mean(HH[isboy & whichV, "F2"],na.rm=TRUE)
+    GF1[v]  <- mean(HH[isgirl & whichV, "F1"],na.rm=TRUE)
+    GF2[v]  <- mean(HH[isgirl & whichV, "F2"],na.rm=TRUE)
+}
+#######################################
+# Plot mean values for men and women: #
+#######################################
+
+# Comment out one of the following two lines, depending on what you want:
+par(ask=TRUE)
+###par(ask=FALSE); png(filename="VowelLab%d.png",width=600,height=600)
+#
+yrange <- range(c(-MF1,-WF1)); xrange <- range(c(-MF2,-WF2))
+plot(-MF2,-MF1,type="n", xlim=xrange, ylim=yrange,
+     xlab="-F2", ylab="-F1", main="Data from Hillenbrand et al. 1995\n(48 women, 45 men)")
+text(-MF2,-MF1,labels=vowelIDs,adj=c(0.5,0.5),col="blue")
+lines(-MF2[1:7],-MF1[1:7], col="blue",lty=2)
+lines(-MF2[8:12],-MF1[8:12],col="blue",lty=3)
+text(-WF2,-WF1,labels=vowelIDs,adj=c(0.5,0.5),col="red")
+lines(-WF2[1:7],-WF1[1:7], col="red",lty=2)
+lines(-WF2[8:12],-WF1[8:12],col="red",lty=3)
+
+###################################################
+# Plot your vowels against the appropriate group: #
+###################################################
+
+MM <- read.table("myvowels",header=TRUE)
+MyF1 <- MM[,"F1"]; MyF2 <- MM[,"F2"]
+newyrange <- range(c(-MF1,-MyF1))
+plot(-MF2,-MF1,type="n", ylim=newyrange,
+     xlab="-F2", ylab="-F1", main="My data as per Praat\nCompared to Hillenbrand male speakers")
+text(-MF2,-MF1,labels=vowelIDs,adj=c(0.5,0.5),col="blue")
+lines(-MF2[1:7],-MF1[1:7], col="blue",lty=2)
+lines(-MF2[8:12],-MF1[8:12],col="blue",lty=3)
+#
+
+text(-MyF2, -MyF1,labels=vowelIDs,adj=c(0.5,0.5),col="magenta")
+lines(-MyF2[1:7],-MyF1[1:7], col="magenta",lty=2)
+lines(-MyF2[8:12],-MyF1[8:12],col="magenta",lty=3)
+
+#####################################
+# Write out your vowel measurements #
+#####################################
+
+vowelfile <- paste("YourNameHere","vowels",sep="_")
+write.table(MM, file="vowelfile")
+
+###############################################################
+
+#####################################################################
+# Turn Hillenbrand speaker-wise "steady state" vowel formants into Z scores #
+#####################################################################
+
+################################################################################
+#     Note that "talker" numbers are counted separately for m,w,b,g categories #
+#      so we need to create a "talkerid" vector:                               #
+################################################################################
+
+TalkerID <- vector(length=NHROWS)
+for(n in 1:NHROWS){
+  TalkerID[n] <- paste(HH[n,"mwbg"], HH[n,"talker"], sep="")
+}
+
+##############################################
+# And find its distinct values via levels(): #
+##############################################
+
+Talkers <- levels(as.factor(TalkerID))
+
+###################################################################
+# Now we make a convenient place to put the Z-scores for F1 & F2: #
+###################################################################
+
+tZ <- matrix(nrow=NHROWS,ncol=2); colnames(tZ) <- c("Z1","Z2")
+# TalkerID, HH columns "mwbg" "talker" "vowel" "dur" "F0" "F1" "F2" "F3", Z-scores:
+HZ <- cbind(TalkerID, HH[,1:8], tZ)
+
+########################################################################
+# And we calculate Z-scores - avoiding talkers with missing F2 values: #
+########################################################################
+
+for (tt in 1:length(Talkers)){
+    whichtalker <- (HZ[,"TalkerID"]==Talkers[tt])
+    F1mean <- mean(HZ[whichtalker,"F1"]); F1sd <- sqrt(var(HZ[whichtalker,"F1"]))
+    F2mean <- mean(HZ[whichtalker,"F2"]); F2sd <- sqrt(var(HZ[whichtalker,"F2"]))
+    if(sum(is.na(HZ[whichtalker,"F2"]))==0){  # no missing values
+	for(v in 1:12){
+           whichvowel <- HZ[,"vowel"]==vowelIDs[v]
+	   which <- whichtalker & whichvowel
+	   HZ[which,"Z1"] <- (HZ[which,"F1"]-F1mean)/F1sd
+	   HZ[which,"Z2"] <- (HZ[which,"F2"]-F2mean)/F2sd
+        }
+     }
+}
+
+##################################################################
+##################################################################
+
+###################################################
+# Scatter plot of formants and of their Z-scores: #
+###################################################
+
+plot(-HZ[,"F2"],-HZ[,"F1"], type="n", xlab="-F2", ylab="-F1",
+      main="Hillenbrand: Scatter plot of F2 and F2");
+points(-HZ[iswoman,"F2"], -HZ[iswoman,"F1"], type="p", pch="o", col="red")
+points(-HZ[isman,"F2"], -HZ[isman,"F1"], type="p", pch="x", col="blue")
+
+
+plot(-HZ[,"Z2"],-HZ[,"Z1"], type="n", xlab="-Z(F2)", ylab="-Z(F1)",
+      main="Hillenbrand: Scatter plot of Z scores of F2 and F2");
+points(-HZ[iswoman,"Z2"], -HZ[iswoman,"Z1"], type="p", pch="o", col="red")
+points(-HZ[isman,"Z2"], -HZ[isman,"Z1"], type="p", pch="x", col="blue")
